@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五子棋遊戲</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            position: relative;
+        }
+        #container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        #board {
+            display: grid;
+            grid-template-columns: repeat(15, 30px);
+            grid-template-rows: repeat(15, 30px);
+            gap: 0;
+            border: 4px solid black;
+            background-color: #ffdead;
+            position: relative;
+        }
+        .cell {
+            width: 30px;
+            height: 30px;
+            position: relative;
+        }
+        .line {
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+            border: 1px solid black;
+        }
+        .piece {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .player {
+            background-color: blue;
+        }
+        .ai {
+            background-color: red;
+        }
+        .scoreboard {
+            position: absolute;
+            top: -40px;
+            display: flex;
+            justify-content: center;
+            width: calc(100% + 40px);
+            left: -20px;
+        }
+        .score {
+            font-size: 18px;
+            margin: 0 20px;
+        }
+        @media (max-width: 600px) {
+            .cell {
+                width: 20px;
+                height: 20px;
+            }
+            .piece {
+                width: 15px;
+                height: 15px;
+            }
+            #board {
+                grid-template-columns: repeat(15, 20px);
+                grid-template-rows: repeat(15, 20px);
+            }
+        }
+        #backButton {
+            padding: 10px;
+            font-size: 1em;
+            cursor: pointer;
+            background-color: white;
+            border: 1px solid black;
+            border-radius: 5px;
+            margin: 0 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div class="scoreboard">
+            <p class="score">玩家得分: <span id="playerScore">0</span></p>
+            <button id="backButton" onclick="goBack()">返回選單</button>
+            <p class="score">對手得分: <span id="aiScore">0</span></p>
+        </div>
+        <div id="board"></div>
+    </div>
+    <button onclick="resetGame()">重置遊戲</button>
+
+    <script>
+        const board = document.getElementById('board');
+        const playerScoreElem = document.getElementById('playerScore');
+        const aiScoreElem = document.getElementById('aiScore');
+
+        let boardState = Array(15).fill().map(() => Array(15).fill(0));
+        let playerScore = 0;
+        let aiScore = 0;
+
+        function createBoard() {
+            board.innerHTML = '';
+            for (let y = 0; y < 15; y++) {
+                for (let x = 0; x < 15; x++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    const line = document.createElement('div');
+                    line.classList.add('line');
+                    cell.appendChild(line);
+                    cell.dataset.x = x;
+                    cell.dataset.y = y;
+                    cell.addEventListener('click', playerMove);
+                    board.appendChild(cell);
+                }
+            }
+        }
+
+        function playerMove(event) {
+            const x = parseInt(event.target.parentElement.dataset.x);
+            const y = parseInt(event.target.parentElement.dataset.y);
+            if (boardState[y][x] === 0) {
+                boardState[y][x] = 1;
+                event.target.parentElement.appendChild(createPiece('player'));
+                if (checkWinner(1)) {
+                    alert('玩家獲勝！');
+                    playerScore++;
+                    updateScores();
+                    resetGame();
+                    return;
+                }
+                setTimeout(aiMove, 500);
+            }
+        }
+
+        function aiMove() {
+            let move = findWinningMove(2) || findWinningMove(1) || findPotentialThreat(2) || findPotentialThreat(1) || findRandomMove();
+            if (move) {
+                boardState[move.y][move.x] = 2;
+                const cell = board.querySelector(`[data-x='${move.x}'][data-y='${move.y}']`);
+                cell.appendChild(createPiece('ai'));
+                if (checkWinner(2)) {
+                    alert('對手獲勝！');
+                    aiScore++;
+                    updateScores();
+                    resetGame();
+                    return;
+                }
+            }
+        }
+
+        function findWinningMove(player) {
+            for (let y = 0; y < 15; y++) {
+                for (let x = 0; x < 15; x++) {
+                    if (boardState[y][x] === 0) {
+                        boardState[y][x] = player;
+                        if (checkWinner(player)) {
+                            boardState[y][x] = 0;
+                            return { x, y };
+                        }
+                        boardState[y][x] = 0;
+                    }
+                }
+            }
+            return null;
+        }
+
+        function findPotentialThreat(player) {
+            for (let y = 0; y < 15; y++) {
+                for (let x = 0; x < 15; x++) {
+                    if (boardState[y][x] === 0) {
+                        boardState[y][x] = player;
+                        if (checkPotentialThreat(player)) {
+                            boardState[y][x] = 0;
+                            return { x, y };
+                        }
+                        boardState[y][x] = 0;
+                    }
+                }
+            }
+            return null;
+        }
+
+        function checkPotentialThreat(player) {
+            const directions = [
+                { dx: 1, dy: 0 },
+                { dx: 0, dy: 1 },
+                { dx: 1, dy: 1 },
+                { dx: 1, dy: -1 }
+            ];
+            for (let y = 0; y < 15; y++) {
+                for (let x = 0; x < 15; x++) {
+                    if (boardState[y][x] === player) {
+                        for (let { dx, dy } of directions) {
+                            if (checkThreatDirection(x, y, dx, dy, player)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function checkThreatDirection(x, y, dx, dy, player) {
+            let count = 0;
+            for (let i = 0; i < 5; i++) {
+                const nx = x + i * dx;
+                const ny = y + i * dy;
+                if (nx >= 0 && nx < 15 && ny >= 0 && ny < 15 && boardState[ny][nx] === player) {
+                    count++;
+                } else {
+                    break;
+                }
+            }
+            return count >= 3; // Consider a position a threat if there are 3 in a row
+        }
+
+        function findRandomMove() {
+            let moves = [];
+            for (let y = 0; y < 15; y++) {
+                for (let x = 0; x < 15; x++) {
+                    if (boardState[y][x] === 0) {
+                        moves.push({ x, y });
+                    }
+                }
+            }
+            return moves.length ? moves[Math.floor(Math.random() * moves.length)] : null;
+        }
+
+        function createPiece(playerClass) {
+            const piece = document.createElement('div');
+            piece.classList.add('piece', playerClass);
+            return piece;
+        }
+
+        function checkWinner(player) {
+            const directions = [
+                { dx: 1, dy: 0 },
+                { dx: 0, dy: 1 },
+                { dx: 1, dy: 1 },
+                { dx: 1, dy: -1 }
+            ];
+            for (let y = 0; y < 15; y++) {
+                for (let x = 0; x < 15; x++) {
+                    if (boardState[y][x] === player) {
+                        for (let { dx, dy } of directions) {
+                            if (checkDirection(x, y, dx, dy, player)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function checkDirection(x, y, dx, dy, player) {
+            let count = 0;
+            for (let i = 0; i < 5; i++) {
+                const nx = x + i * dx;
+                const ny = y + i * dy;
+                if (nx >= 0 && nx < 15 && ny >= 0 && ny < 15 && boardState[ny][nx] === player) {
+                    count++;
+                } else {
+                    break;
+                }
+            }
+            return count === 5;
+        }
+
+        function updateScores() {
+            playerScoreElem.textContent = playerScore;
+            aiScoreElem.textContent = aiScore;
+        }
+
+        function resetGame() {
+            boardState = Array(15).fill().map(() => Array(15).fill(0));
+            createBoard();
+        }
+
+        function goBack() {
+            window.location.href = 'file:///F:/%E5%A0%B1%E5%91%8A/%E4%BA%94%E5%AD%90%E6%A3%8B%E6%9C%80%E7%B5%82%E7%89%88/index.html';
+        }
+
+        createBoard();
+    </script>
+</body>
+</html>
