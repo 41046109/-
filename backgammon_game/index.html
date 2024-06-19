@@ -41,10 +41,15 @@
     <a class="menu-item" href="members.html">成員名單</a>
     <a class="menu-item" href="purpose.html">製作目的與目標</a>
     <a class="menu-item" href="game-options.html">遊戲選擇</a>
-    const socket = io();
+    
+ <script>   const socket = io();
 socket.on('player_wins', function(data) {
     alert(data.message);
 });
-
+$.post('/move', {x: x, y: y}, function(data) {
+    if (data.winner) {
+        alert(data.winner + '獲勝！');
+    }
+});</script>
 </body>
 </html>
